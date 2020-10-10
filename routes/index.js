@@ -8,12 +8,12 @@ router.get('/', function(req, res, next) {
 
 
 router.post('/shorten', async(req, res, next) =>{
-
+  console.log(req.body);
      let regex = /^[0-9a-zA-Z_]{4,}$/
 
 
      if (req.body.shortcode==="") {
-       res.status(400).send("Shortcode required")
+       res.status(400).send("Bad Request")
      }
      else if(req.body.shortcode===undefined){
 
@@ -34,7 +34,7 @@ router.post('/shorten', async(req, res, next) =>{
         console.log(makeShortCode, "new makeShortCode");
 
        if (regex1.test(makeShortCode)===true) {
-         Url.findOne({url:req.body.url})
+         Url.findOne({url:req.body.url.toString()})
              .then(updatedDocument => {
                if(updatedDocument) {
                  res.send("Url Already Exists")
@@ -49,7 +49,7 @@ router.post('/shorten', async(req, res, next) =>{
                      res.status(400).end("save error")
                    }
                    else {
-                     res.status(200).send(`Saved Successfully ${docs}`)
+                     res.status(201).send(`Saved Successfully ${docs}`)
                    }
                  })
                }
@@ -68,7 +68,7 @@ router.post('/shorten', async(req, res, next) =>{
           Url.findOne({url:req.body.url})
               .then(updatedDocument => {
                 if(updatedDocument) {
-                  res.send("Url Already Exists")
+                  res.status(409).send("desired URL is already in use")
                 } else {
                   let url = new Url({
                     shortcode:req.body.shortcode,
@@ -80,7 +80,7 @@ router.post('/shorten', async(req, res, next) =>{
                       res.status(400).end("save error")
                     }
                     else {
-                      res.status(200).send(`Saved Successfully ${docs}`)
+                      res.status(201).send(`Saved Successfully ${docs}`)
                     }
                   })
                 }
@@ -101,18 +101,17 @@ router.post('/shorten', async(req, res, next) =>{
 
 
 router.get('/:shortcode', async(req, res, next)=>{
-  console.log(req.params.shortcode.toString());
+
+  console.log("req.params", req.params);
+
   Url.findOne({shortcode:req.params.shortcode.toString()})
       .then(updatedDocument => {
         if(updatedDocument) {
 
           let count = updatedDocument.redirectCount + 1
-          let obj = {
-            redirectCount: count,
-            lastSeenDate: Date()
-          }
+
           Url.findOneAndUpdate({shortcode:req.params.shortcode.toString()}, {$set:{redirectCount: count,
-          lastSeenDate: Date()}}, {new:true}, function(err, data){
+          lastSeenDate: Date()}}, { returnNewDocument: true }, function(err, data){
             if (err) {
               console.log("count err", err);
             }
@@ -121,7 +120,7 @@ router.get('/:shortcode', async(req, res, next)=>{
             }
           })
         } else {
-          res.status(404).send(`http://${req.params.shortcode}.com required, shortcode is not found in the system`)
+          res.status(404).send( {message: `shortcode is not found in the system`,Location: `http://${req.params.shortcode} ---->required`})
         }
 
       })
@@ -130,20 +129,26 @@ router.get('/:shortcode', async(req, res, next)=>{
 })
 
 router.get('/:shortcode/stats', async(req, res, next)=>{
-  Url.findOne({shortcode:req.params.shortcode.toString()})
-      .then(updatedDocument => {
-        if(updatedDocument) {
+  try{
+    Url.findOne({shortcode:req.params.shortcode.toString()})
+        .then(updatedDocument => {
+          if(updatedDocument) {
 
 
-              res.status(200).send({redirectCount:updatedDocument.redirectCount,startDate:new Date(updatedDocument.startDate), lastSeenDate:new Date(updatedDocument.lastSeenDate)})
+                res.status(200).send({redirectCount:updatedDocument.redirectCount,startDate:new Date(updatedDocument.startDate), lastSeenDate:new Date(updatedDocument.lastSeenDate)})
 
 
-        } else {
-          res.status(404).send(`http://${req.params.shortcode}.com required, shortcode is not found in the system`)
-        }
+          } else {
+            res.status(404).send(`http://${req.params.shortcode}.com required, shortcode is not found in the system`)
+          }
 
-      })
-      .catch(err => console.error(`Failed to find document: ${err}`))
+        })
+        .catch(err => console.error(`Failed to find document: ${err}`))
+  }
+  catch{
+    res.send("unexpected error")
+  }
+
 })
 
 
